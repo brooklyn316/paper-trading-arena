@@ -73,9 +73,22 @@ later.
 $0 commission simulated. Log executed price vs. mid-price at fill time so
 effective spread cost is visible over time.
 
+## Infra
+
+- Supabase project: `paper-trading-arena` (id `oxnhgofiyllhsawgypyd`), org
+  `VoxLabs1` (free tier, $0/mo), region ap-southeast-2. Deliberately a
+  separate Supabase org from Bot Lab's, not just a separate project —
+  Bot Lab's org is on Pro, and a second project there would have billed
+  ~$10/mo in compute on top of it. Schema applied via migration `init`,
+  RLS on with public-read policies on every table, no advisor warnings.
+- GitHub repo: not yet created (no `gh` auth in this sandbox) — working
+  locally in the workspace for now, committing as we go.
+
 ## Open items / TODO
 
 - [ ] Finalize force-close cron design (task #10)
-- [ ] Confirm Supabase project cost ($10/mo) with David before creating
+- [ ] David to paste `SUPABASE_SERVICE_ROLE_KEY` from the Supabase dashboard
+      (Project Settings -> API) — not obtainable via the Supabase MCP tools
+      by design
+- [ ] Alpaca paper API keys for day-trader-v1
 - [ ] Decide GitHub repo hosting (new repo vs. workspace-only for now)
-- [ ] Alpaca paper API keys (David generating via Alpaca dashboard)
