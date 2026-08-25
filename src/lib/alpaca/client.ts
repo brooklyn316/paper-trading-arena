@@ -38,6 +38,13 @@ export class AlpacaClient {
   ): Promise<T> {
     const res = await fetch(`${baseUrl}${path}`, {
       ...init,
+      // Next.js caches fetch() responses by default, keyed on URL. Several of
+      // our calls (e.g. getBarsSince with a fixed session-start timestamp)
+      // hit the exact same URL on every cron cycle, so without this every
+      // call after the first would silently return the first cycle's stale
+      // bars forever — route-level `dynamic = "force-dynamic"` does NOT
+      // reliably prevent this for individual fetch calls.
+      cache: "no-store",
       headers: {
         ...this.authHeaders(),
         "Content-Type": "application/json",
