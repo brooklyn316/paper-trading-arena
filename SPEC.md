@@ -79,16 +79,32 @@ effective spread cost is visible over time.
   `VoxLabs1` (free tier, $0/mo), region ap-southeast-2. Deliberately a
   separate Supabase org from Bot Lab's, not just a separate project —
   Bot Lab's org is on Pro, and a second project there would have billed
-  ~$10/mo in compute on top of it. Schema applied via migration `init`,
-  RLS on with public-read policies on every table, no advisor warnings.
-- GitHub repo: not yet created (no `gh` auth in this sandbox) — working
-  locally in the workspace for now, committing as we go.
+  ~$10/mo in compute on top of it. Schema applied via migrations `init` and
+  `broaden_order_status_values`, RLS on with public-read policies on every
+  table, no advisor warnings.
+- GitHub repo: `brooklyn316/paper-trading-arena`, pushed from David's Mac.
+- Vercel project: `paper-trading-arena`, git-linked, auto-deploys on push to
+  `main`. Live at `paper-trading-arena-tawny.vercel.app`.
+- Local dev copy lives at `~/Documents/Programmes/paper-trading-arena` on
+  David's Mac, connected to this session via the desktop app's folder bridge.
 
 ## Open items / TODO
 
-- [ ] Finalize force-close cron design (task #10)
-- [ ] David to paste `SUPABASE_SERVICE_ROLE_KEY` from the Supabase dashboard
-      (Project Settings -> API) — not obtainable via the Supabase MCP tools
-      by design
-- [ ] Alpaca paper API keys for day-trader-v1
-- [ ] Decide GitHub repo hosting (new repo vs. workspace-only for now)
+- [x] David to paste `SUPABASE_SERVICE_ROLE_KEY` from the Supabase dashboard
+- [x] Alpaca paper API keys for day-trader-v1
+- [x] GitHub repo created and pushed
+- [x] Vercel project created and deployed, Alpaca connectivity verified live
+- [x] day-trader-v1 cron route built: `src/lib/time.ts` (ET market-hours
+      helpers), `src/lib/indicators.ts` (VWAP/momentum/volume-ratio),
+      `src/lib/bots/day-trader-v1/config.ts` + `db.ts`,
+      `src/app/api/cron/day-trader-v1/route.ts` (scan + bracket-order entry +
+      reconciliation), `src/app/api/cron/force-close/route.ts` (independent
+      3:55pm ET hard close), `vercel.json` cron schedule. Type-checks and
+      builds clean.
+- [ ] Push to `main`, confirm Vercel picks up `vercel.json` and registers
+      both cron jobs (Vercel dashboard -> Project -> Cron Jobs)
+- [ ] Watch a live market-hours cron fire, confirm rows land correctly in
+      `scan_log`, `orders`, `positions`, `equity_ticks`
+- [ ] Remove the temporary `/api/debug/account` route once the real cron
+      route is verified live
+- [ ] Build the public dashboard UI (deferred to last, on purpose)

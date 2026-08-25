@@ -60,11 +60,13 @@ export interface AlpacaOrder {
   symbol: string;
   qty: string | null;
   side: AlpacaOrderSide;
-  type: string;
+  type: string; // 'market' | 'limit' | 'stop' | 'stop_limit' — bracket legs use 'stop' (stop-loss) and 'limit' (take-profit)
   order_class: string;
   status: string;
   filled_qty: string;
   filled_avg_price: string | null;
+  limit_price?: string | null;
+  stop_price?: string | null;
   submitted_at: string;
   filled_at: string | null;
   legs: AlpacaOrder[] | null;

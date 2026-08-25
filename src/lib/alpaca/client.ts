@@ -102,6 +102,46 @@ export class AlpacaClient {
     );
   }
 
+  /**
+   * All 5-minute bars for a set of symbols from `startISO` up to now. Used
+   * for session VWAP, which needs every bar since the market open (9:30am
+   * ET) rather than a fixed recent window — the correct bar count varies
+   * with the time of day. Paginates via `next_page_token` since Alpaca caps
+   * each response page.
+   */
+  async getBarsSince(
+    symbols: string[],
+    startISO: string
+  ): Promise<AlpacaBarsResponse> {
+    const bars: Record<string, AlpacaBarsResponse["bars"][string]> = {};
+    let pageToken: string | undefined;
+
+    do {
+      const params = new URLSearchParams({
+        symbols: symbols.join(","),
+        timeframe: "5Min",
+        start: startISO,
+        feed: this.config.feed,
+        adjustment: "raw",
+        sort: "asc",
+        limit: "1000",
+      });
+      if (pageToken) params.set("page_token", pageToken);
+
+      const page = await this.request<AlpacaBarsResponse>(
+        this.config.dataBaseUrl,
+        `/v2/stocks/bars?${params.toString()}`
+      );
+
+      for (const [symbol, symbolBars] of Object.entries(page.bars)) {
+        bars[symbol] = [...(bars[symbol] ?? []), ...symbolBars];
+      }
+      pageToken = page.next_page_token ?? undefined;
+    } while (pageToken);
+
+    return { bars, next_page_token: null };
+  }
+
   async getLatestQuote(symbol: string): Promise<AlpacaLatestQuoteResponse> {
     const params = new URLSearchParams({ feed: this.config.feed });
     return this.request<AlpacaLatestQuoteResponse>(
@@ -133,6 +173,28 @@ export class AlpacaClient {
 
   async getOrder(orderId: string): Promise<AlpacaOrder> {
     return this.request<AlpacaOrder>(this.config.tradingBaseUrl, `/v2/orders/${orderId}`);
+  }
+
+  /**
+   * Recent orders, optionally filtered by symbol. Used during reconciliation
+   * to look up bracket leg fills, and to self-heal if a position exists at
+   * Alpaca that our DB doesn't know about (e.g. the cron crashed right after
+   * submitting an order but before recording it).
+   */
+  async listOrders(
+    params: { status?: "open" | "closed" | "all"; symbols?: string[]; limit?: number } = {}
+  ): Promise<AlpacaOrder[]> {
+    const qp = new URLSearchParams({
+      status: params.status ?? "all",
+      limit: String(params.limit ?? 50),
+      direction: "desc",
+      nested: "true", // include bracket legs inline on the parent order
+    });
+    if (params.symbols?.length) qp.set("symbols", params.symbols.join(","));
+    return this.request<AlpacaOrder[]>(
+      this.config.tradingBaseUrl,
+      `/v2/orders?${qp.toString()}`
+    );
   }
 
   /** Cancels every open order, then market-closes every open position. Used

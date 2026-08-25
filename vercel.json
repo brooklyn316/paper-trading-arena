@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/day-trader-v1", "schedule": "*/5 13-21 * * 1-5" },
+    { "path": "/api/cron/force-close", "schedule": "*/5 19-21 * * 1-5" }
+  ]
+}
