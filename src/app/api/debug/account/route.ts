@@ -17,11 +17,12 @@ export async function GET(req: NextRequest) {
 
   try {
     const client = createAlpacaClientFromEnv("DAY_TRADER_V1");
-    const [account, positions] = await Promise.all([
+    const [account, positions, orders] = await Promise.all([
       client.getAccount(),
       client.getPositions(),
+      client.listOrders({ status: "all", limit: 50 }),
     ]);
-    return NextResponse.json({ account, positions });
+    return NextResponse.json({ account, positions, orders });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
