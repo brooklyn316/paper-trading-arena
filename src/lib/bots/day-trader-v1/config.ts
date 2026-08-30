@@ -30,13 +30,18 @@ export const SIGNAL = {
 };
 
 export const RISK = {
-  startingCash: 500,
+  // Documentation only — the real, authoritative starting cash lives in the
+  // Supabase `bots.starting_cash` column (see db.ts's getCurrentTrackedCash),
+  // since that's what already survived the original $500 -> $10,000 change
+  // without a code deploy. Keep this in sync so it doesn't mislead.
+  startingCash: 10000,
   // Max fraction of the bot's tracked portfolio value risked per trade.
   maxPositionPct: 0.4,
-  // Hard dollar cap, applied in addition to the pct cap (on $500 starting
-  // cash these are the same number, but the pct cap is what scales if the
-  // ledger grows or shrinks).
-  maxPositionDollars: 200,
+  // Hard dollar cap, applied in addition to the pct cap. Scaled with the
+  // $10,000 starting cash (40% of it) so it isn't a silent bottleneck like
+  // it was at $200 on the old $500 budget, where it made every watchlist
+  // symbol unaffordable regardless of the pct rule.
+  maxPositionDollars: 4000,
   stopLossPct: 0.01, // 1% below entry
   takeProfitPct: 0.02, // 2% above entry (2:1 reward/risk)
 };

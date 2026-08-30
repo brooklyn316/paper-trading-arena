@@ -38,7 +38,7 @@ and takes the **first** qualifying signal (one position at a time).
 ### Position sizing
 
 - One open position at a time
-- Max 40% of portfolio per trade ($200 max on a $500 start)
+- Max 40% of portfolio per trade ($4,000 max on a $10,000 start)
 - No re-entry on a symbol after a stop-out that same day — move to the next
   qualifying symbol on the list
 
@@ -60,7 +60,13 @@ and takes the **first** qualifying signal (one position at a time).
 
 ### Starting cash
 
-$500 simulated cash.
+$10,000 simulated cash (raised from the original $500 on 2026-08-29 — at
+$500/$200-max, every symbol on the watchlist traded above the $200 cap, so
+the bot could never afford a single whole share of anything and had zero
+chance of ever trading). Authoritative value lives in Supabase's
+`bots.starting_cash` column, not in code — `getCurrentTrackedCash()` reads
+it from there. The `RISK.startingCash` constant in `config.ts` is
+documentation only and must be kept in sync by hand.
 
 ### Data feed
 
@@ -101,10 +107,27 @@ effective spread cost is visible over time.
       reconciliation), `src/app/api/cron/force-close/route.ts` (independent
       3:55pm ET hard close), `vercel.json` cron schedule. Type-checks and
       builds clean.
-- [ ] Push to `main`, confirm Vercel picks up `vercel.json` and registers
-      both cron jobs (Vercel dashboard -> Project -> Cron Jobs)
-- [ ] Watch a live market-hours cron fire, confirm rows land correctly in
-      `scan_log`, `orders`, `positions`, `equity_ticks`
-- [ ] Remove the temporary `/api/debug/account` route once the real cron
-      route is verified live
-- [ ] Build the public dashboard UI (deferred to last, on purpose)
+- [x] Push to `main`, confirm Vercel picks up `vercel.json` and registers
+      both cron jobs
+- [x] Watch a live market-hours cron fire, confirm rows land correctly in
+      `scan_log` and `equity_ticks` — confirmed 2026-08-25
+- [x] Found + fixed: Next.js was silently caching every Alpaca fetch() call
+      by URL, so the bot saw the same frozen prices/bars all day and could
+      never clear `insufficient_bars`. Fixed by adding `cache: "no-store"`
+      in `AlpacaClient`'s shared `request()`. Confirmed fixed 2026-08-26
+      onward (prices vary intraday again).
+- [x] Found + fixed: 3 real signals fired (Aug 26 AAPL, Aug 27 NVDA x2) but
+      zero orders ever reached Alpaca (confirmed via order history — empty,
+      account untouched at $100k). Root cause: at $500 starting cash / $200
+      max position, every watchlist symbol traded above $200/share, so
+      qty always floored to 0 and the entry silently no-opped before
+      calling Alpaca. Fixed 2026-08-29 by raising starting cash to $10,000
+      (`bots.starting_cash` in Supabase) and the max-position dollar cap to
+      $4,000 (`RISK.maxPositionDollars` in config.ts) — same 40% ratio,
+      scaled up so it isn't a silent bottleneck at current 2026 share prices.
+- [ ] Watch for a live trade with the new $10k budget and confirm a real
+      bracket order + position row get written correctly
+- [ ] Remove the temporary `/api/debug/account` route once a real trade is
+      verified live
+- [ ] Build the public dashboard UI (deferred to last, on purpose) — next
+      up now that the budget fix is in
