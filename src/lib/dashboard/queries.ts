@@ -165,7 +165,7 @@ async function summarizeBot(
   const [latestEquityRes, closedRes] = await Promise.all([
     supabase
       .from("equity_ticks")
-      .select("equity, cash")
+      .select("market_value")
       .eq("bot_id", bot.id)
       .order("ts", { ascending: false })
       .limit(1)
@@ -177,7 +177,14 @@ async function summarizeBot(
   const closed = closedRes.data ?? [];
   const realizedTotal = closed.reduce((sum, p) => sum + Number(p.realized_pnl ?? 0), 0);
   const currentCash = startingCash + realizedTotal;
-  const currentEquity = latestEquityRes.data ? Number(latestEquityRes.data.equity) : currentCash;
+  // Equity = live cash + the open position's last-known market value — NOT
+  // the stored `equity` column on the latest tick. That column bakes in
+  // whatever starting_cash was true *when the cron last ran*, so it goes
+  // stale (and badly misleading) the moment starting_cash changes by hand
+  // and the market is closed — exactly what happened raising it to $10,000
+  // over a weekend, where the last tick still reflected the old $500 base.
+  const latestMarketValue = latestEquityRes.data ? Number(latestEquityRes.data.market_value) : 0;
+  const currentEquity = currentCash + latestMarketValue;
   const totalPnl = currentEquity - startingCash;
   const wins = closed.filter((p) => Number(p.realized_pnl ?? 0) > 0).length;
 

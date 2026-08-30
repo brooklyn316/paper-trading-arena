@@ -142,3 +142,13 @@ effective spread cost is visible over time.
       fixture-data preview page, deleted before commit) since this sandbox
       can't reach Supabase directly (same egress restriction as Alpaca).
       Type-checks and builds clean.
+- [x] Found + fixed (2026-08-30, caught on the live site right after
+      shipping the dashboard): stat tiles showed Equity $500 / Cash $10K /
+      Total P&L -95% simultaneously — internally contradictory, and not a
+      real loss. `summarizeBot()` was reading `currentEquity` straight off
+      the latest `equity_ticks.equity` column, a value baked in by whatever
+      `starting_cash` was true the last time the cron ran (Friday, at the
+      old $500 base) — stale the moment `starting_cash` is changed by hand
+      over a weekend with the market closed. Fixed by computing equity live
+      as `currentCash + latest equity_ticks.market_value` instead of trusting
+      the stored `equity` column.
