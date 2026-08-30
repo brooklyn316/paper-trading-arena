@@ -129,5 +129,16 @@ effective spread cost is visible over time.
       bracket order + position row get written correctly
 - [ ] Remove the temporary `/api/debug/account` route once a real trade is
       verified live
-- [ ] Build the public dashboard UI (deferred to last, on purpose) — next
-      up now that the budget fix is in
+- [x] Build the public dashboard UI: `src/lib/dashboard/queries.ts` (public/
+      publishable-key reads — stat summary per bot, equity history, open
+      position, recent closed trades, latest scan cycle), `src/components/
+      EquityChart.tsx` (hand-rolled SVG line chart with hover crosshair,
+      built to the dataviz skill's mark specs), `src/app/page.tsx` (stat
+      tiles, equity curve, open position + latest scan panels, recent
+      trades table, leaderboard — multi-bot-ready even with one bot).
+      Also patched `createPublicClient` with `cache: "no-store"` — same
+      Next.js fetch-caching bug as the Alpaca client, caught before it
+      shipped this time. Verified visually (light + dark, via a temporary
+      fixture-data preview page, deleted before commit) since this sandbox
+      can't reach Supabase directly (same egress restriction as Alpaca).
+      Type-checks and builds clean.
