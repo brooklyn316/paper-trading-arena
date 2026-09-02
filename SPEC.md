@@ -185,3 +185,14 @@ effective spread cost is visible over time.
       direct SQL update (Supabase MCP) rather than leaving bad history
       behind. Position sizing itself was never affected — it only runs when
       no position is open, when tracked cash and net cash are identical.
+- [x] Found + fixed (2026-09-02, same session, caught by re-checking the
+      live site right after deploying the fix above): the dashboard's own
+      `currentEquity` was still adding the latest `equity_ticks.market_value`
+      onto cash unconditionally, even with no position open. Once the one
+      real trade closed, that "latest" tick's `market_value` was a
+      transient artifact from a couple seconds after the close (Alpaca's own
+      position list briefly lagging its own fill) — so the site kept
+      showing $13.5K/+34.79% after the fix above should have brought it back
+      to ~$10K/~0.1%. Fixed by only counting that market value when a
+      position is actually open per our own DB (`positions.status='open'`);
+      with nothing open, equity is just cash.

@@ -241,7 +241,16 @@ async function summarizeBot(
   // stale (and badly misleading) the moment starting_cash changes by hand
   // and the market is closed — exactly what happened raising it to $10,000
   // over a weekend, where the last tick still reflected the old $500 base.
-  const latestMarketValue = latestEquityRes.data ? Number(latestEquityRes.data.market_value) : 0;
+  //
+  // Only add that market value when a position is actually open right now
+  // (per our own DB) — the "latest" equity_ticks row can otherwise be a
+  // stale/transient read from just after a position closed (Alpaca's own
+  // position list briefly lagging its own fill by a second or two), and
+  // adding it back in unconditionally resurrects the exact double-counting
+  // bug this function exists to avoid: no open position means nothing is
+  // tied up in stock, so equity is just cash.
+  const latestMarketValue =
+    openRes.data && latestEquityRes.data ? Number(latestEquityRes.data.market_value) : 0;
   const currentEquity = currentCash + latestMarketValue;
   const totalPnl = currentEquity - startingCash;
   const wins = closed.filter((p) => Number(p.realized_pnl ?? 0) > 0).length;
