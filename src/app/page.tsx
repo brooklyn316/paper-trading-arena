@@ -1,5 +1,15 @@
+import Link from "next/link";
 import { getDashboardData } from "@/lib/dashboard/queries";
 import EquityChart from "@/components/EquityChart";
+import StatTile from "@/components/StatTile";
+import {
+  formatCurrency,
+  formatSignedCurrency,
+  formatCompactCurrency,
+  formatCompactSignedCurrency,
+  formatPct,
+  formatDateTime,
+} from "@/lib/dashboard/format";
 
 // Only one bot exists today, but the schema and this page are both
 // multi-bot-ready (bot_id everywhere, a leaderboard table below) — this is
@@ -9,97 +19,26 @@ const FEATURED_BOT_ID = "day-trader-v1";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function formatCurrency(v: number): string {
-  return v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-}
-
-function formatSignedCurrency(v: number): string {
-  const formatted = formatCurrency(Math.abs(v));
-  return v >= 0 ? `+${formatted}` : `-${formatted}`;
-}
-
-// Stat-tile hero values use compact notation (auto-compact: $10.2K, not
-// $10,237.33) so they never overflow a narrow tile at hero-figure size —
-// full precision stays available in the equity chart tooltip and tables.
-function formatCompactCurrency(v: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(v);
-}
-
-function formatCompactSignedCurrency(v: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 1,
-    signDisplay: "always",
-  }).format(v);
-}
-
-function formatPct(v: number): string {
-  return `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
-}
-
-function formatDateTime(ts: string): string {
-  return new Date(ts).toLocaleString("en-US", {
-    timeZone: "America/New_York",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function StatTile({
-  label,
-  value,
-  title,
-  delta,
-  deltaGood,
-}: {
-  label: string;
-  value: string;
-  title?: string;
-  delta?: string;
-  deltaGood?: boolean;
-}) {
-  return (
-    <div className="rounded-lg border border-[var(--chart-border)] bg-[var(--chart-surface)] p-4">
-      <div className="text-xs text-[var(--text-muted)]">{label}</div>
-      <div
-        className="mt-1 truncate text-2xl font-semibold text-[var(--text-primary)]"
-        title={title}
-      >
-        {value}
-      </div>
-      {delta && (
-        <div
-          className="mt-1 text-xs font-medium"
-          style={{ color: deltaGood ? "var(--status-good)" : "var(--status-critical)" }}
-        >
-          {delta}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default async function Home() {
   const data = await getDashboardData(FEATURED_BOT_ID);
   const { bot, equityHistory, openPosition, recentTrades, latestScan, leaderboard } = data;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Paper Trading Arena</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          Algorithmic bots trading Alpaca paper accounts, tracked against their own simulated
-          budgets — not Alpaca&apos;s $100,000 default balance.
-        </p>
+      <header className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Paper Trading Arena</h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            Algorithmic bots trading Alpaca paper accounts, tracked against their own simulated
+            budgets — not Alpaca&apos;s $100,000 default balance.
+          </p>
+        </div>
+        <Link
+          href="/history"
+          className="shrink-0 whitespace-nowrap rounded-md border border-[var(--chart-border)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        >
+          Full history →
+        </Link>
       </header>
 
       {!bot ? (

@@ -92,10 +92,31 @@ export function sessionStartUtcISO(now: Date = new Date()): string {
   return fromZonedTime(zonedWallTime, MARKET_TZ).toISOString();
 }
 
-/** Today's date as YYYY-MM-DD in the market's timezone (for daily bookkeeping keys). */
-export function todayDateStringInMarketTz(now: Date = new Date()): string {
-  const p = zonedParts(now);
+/** YYYY-MM-DD in the market's timezone for the given instant. */
+export function marketDateString(instant: Date): string {
+  const p = zonedParts(instant);
   const mm = String(p.month + 1).padStart(2, "0");
   const dd = String(p.date).padStart(2, "0");
   return `${p.year}-${mm}-${dd}`;
+}
+
+/** Today's date as YYYY-MM-DD in the market's timezone (for daily bookkeeping keys). */
+export function todayDateStringInMarketTz(now: Date = new Date()): string {
+  return marketDateString(now);
+}
+
+/**
+ * UTC instant bounds [start, end) for a given ET calendar date ("YYYY-MM-DD"),
+ * for querying rows that fall on that trading day. Built from ET wall-clock
+ * parts so the boundary is correct regardless of the server's own timezone
+ * or which EST/EDT offset was in effect on that date.
+ */
+export function marketDayBoundsUtc(dateStr: string): { startUtcISO: string; endUtcISO: string } {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const startWall = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+  const endWall = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0));
+  return {
+    startUtcISO: fromZonedTime(startWall, MARKET_TZ).toISOString(),
+    endUtcISO: fromZonedTime(endWall, MARKET_TZ).toISOString(),
+  };
 }

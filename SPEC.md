@@ -125,10 +125,11 @@ effective spread cost is visible over time.
       (`bots.starting_cash` in Supabase) and the max-position dollar cap to
       $4,000 (`RISK.maxPositionDollars` in config.ts) — same 40% ratio,
       scaled up so it isn't a silent bottleneck at current 2026 share prices.
-- [ ] Watch for a live trade with the new $10k budget and confirm a real
-      bracket order + position row get written correctly
-- [ ] Remove the temporary `/api/debug/account` route once a real trade is
-      verified live
+- [x] Watch for a live trade with the new $10k budget and confirm a real
+      bracket order + position row get written correctly — confirmed live
+      the week of 2026-08-31 (equity up ~$3.5k on the dashboard).
+- [ ] Remove the temporary `/api/debug/account` route now that a real trade
+      is verified live
 - [x] Build the public dashboard UI: `src/lib/dashboard/queries.ts` (public/
       publishable-key reads — stat summary per bot, equity history, open
       position, recent closed trades, latest scan cycle), `src/components/
@@ -152,3 +153,16 @@ effective spread cost is visible over time.
       over a weekend with the market closed. Fixed by computing equity live
       as `currentCash + latest equity_ticks.market_value` instead of trusting
       the stored `equity` column.
+- [x] Build `/history`: a day-by-day trading history view. `getTradingDays()`
+      + `getDayDetail()` in `queries.ts` (grouped by ET calendar date via new
+      `marketDateString`/`marketDayBoundsUtc` helpers in `time.ts`);
+      `/history` lists every trading day (start/end equity, day P&L, trade
+      count); `/history/[date]` shows that day's equity curve, every trade
+      opened/closed that day with full entry reasoning + exit reason, and
+      every scan cycle (all 10 symbols, every 5 minutes, whether or not it
+      signaled) as collapsible sections, auto-expanded where a signal fired.
+      Shared formatters/StatTile extracted out of `page.tsx` into
+      `lib/dashboard/format.ts` / `components/StatTile.tsx` so the three
+      pages don't drift. Verified visually (light + dark, temporary
+      fixture-data preview routes, deleted before commit). Type-checks and
+      builds clean.
