@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getDayDetail, getTradingDays } from "@/lib/dashboard/queries";
+import { marketDateString } from "@/lib/time";
 import EquityChart from "@/components/EquityChart";
 import StatTile from "@/components/StatTile";
 import {
@@ -9,6 +10,7 @@ import {
   formatCompactSignedCurrency,
   formatPct,
   formatTime,
+  formatDateTime,
   formatDayHeading,
 } from "@/lib/dashboard/format";
 
@@ -20,6 +22,15 @@ export const revalidate = 0;
 
 function statusColor(good: boolean) {
   return good ? "var(--status-good)" : "var(--status-critical)";
+}
+
+// A trade opened and/or closed this day shows here even when the OTHER end
+// falls on a different day (the whole point of "every position opened
+// and/or closed this day" below) — bare "3:10 PM" would misread as 3:10pm
+// *this* day in that case. Fall back to the full date once the timestamp
+// lands outside the page's own date.
+function formatTimeOnDay(ts: string, pageDate: string): string {
+  return marketDateString(new Date(ts)) === pageDate ? formatTime(ts) : formatDateTime(ts);
 }
 
 export default async function DayDetailPage({ params }: { params: { date: string } }) {
@@ -137,6 +148,14 @@ export default async function DayDetailPage({ params }: { params: { date: string
                         <span className="text-xs text-[var(--text-muted)]">
                           {t.status === "open" ? "still open" : "closed"}
                         </span>
+                        {t.closedAt && marketDateString(new Date(t.openedAt)) !== marketDateString(new Date(t.closedAt)) && (
+                          <span
+                            className="rounded px-1.5 py-0.5 text-xs font-medium"
+                            style={{ color: "var(--status-warning)", backgroundColor: "color-mix(in srgb, var(--status-warning) 15%, transparent)" }}
+                          >
+                            held overnight
+                          </span>
+                        )}
                       </div>
                       <div
                         className="font-medium [font-variant-numeric:tabular-nums]"
@@ -147,7 +166,7 @@ export default async function DayDetailPage({ params }: { params: { date: string
                     </div>
                     <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-[var(--text-secondary)] sm:grid-cols-2">
                       <div>
-                        Opened {formatTime(t.openedAt)} at{" "}
+                        Opened {formatTimeOnDay(t.openedAt, date)} at{" "}
                         {t.entryPrice === null ? (
                           <span className="text-[var(--text-muted)]">pending fill</span>
                         ) : (
@@ -156,7 +175,7 @@ export default async function DayDetailPage({ params }: { params: { date: string
                       </div>
                       {t.closedAt && (
                         <div>
-                          Closed {formatTime(t.closedAt)} at{" "}
+                          Closed {formatTimeOnDay(t.closedAt, date)} at{" "}
                           {t.exitPrice === null ? "—" : formatCurrency(t.exitPrice)}
                           {t.exitReason && <span className="text-[var(--text-muted)]"> — {t.exitReason}</span>}
                         </div>

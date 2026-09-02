@@ -10,8 +10,9 @@ const SESSION_CLOSE = { hour: 16, minute: 0 };
 // for a position to actually develop before the hard force-close.
 const NEW_POSITION_CUTOFF = { hour: 15, minute: 45 };
 
-// Force-close window: cron fires every 5 min from ~3:55pm, so treat 3:55-4:00
-// as "close everything now" regardless of which exact minute the cron lands on.
+// Force-close window opens at 3:55pm ET and deliberately has no closing
+// bound here — see isForceCloseWindow. The cron's own schedule (vercel.json,
+// currently 19-21 UTC) is what actually stops it from firing forever.
 const FORCE_CLOSE_START = { hour: 15, minute: 55 };
 
 function zonedParts(date: Date) {
@@ -64,15 +65,27 @@ export function canOpenNewPosition(now: Date = new Date()): boolean {
   );
 }
 
-/** True from 3:55pm ET through the close — the force-close route's active window. */
+/**
+ * True from 3:55pm ET onward — the force-close route's active window.
+ *
+ * Deliberately open-ended rather than closing at 4:00pm: this used to be a
+ * single 5-minute-wide window (3:55-4:00), which meant exactly one cron tick
+ * per day was ever eligible to actually close a position. When that one
+ * attempt didn't take (2026-08-31 — the cron fired and returned success, but
+ * the position stayed open), there was no same-day retry, and it sat open
+ * overnight until the next day's window caught it — a real risk for a bot
+ * whose whole design is "no overnight exposure." The route itself is a safe
+ * no-op once nothing is open (getOpenPosition() returns null), so retrying
+ * every 5 minutes for as long as the cron keeps firing costs nothing and
+ * turns a missed attempt into a few-minutes-late one instead of a
+ * next-day one. In practice this is bounded by the cron's own schedule
+ * (vercel.json, currently 19-21 UTC), not by this function.
+ */
 export function isForceCloseWindow(now: Date = new Date()): boolean {
   const p = zonedParts(now);
   if (!isWeekday(p.day)) return false;
   const mins = minutesSinceMidnight(p.hour, p.minute);
-  return (
-    mins >= minutesSinceMidnight(FORCE_CLOSE_START.hour, FORCE_CLOSE_START.minute) &&
-    mins < minutesSinceMidnight(SESSION_CLOSE.hour, SESSION_CLOSE.minute)
-  );
+  return mins >= minutesSinceMidnight(FORCE_CLOSE_START.hour, FORCE_CLOSE_START.minute);
 }
 
 /**

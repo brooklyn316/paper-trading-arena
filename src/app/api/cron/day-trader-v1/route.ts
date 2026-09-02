@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       // a bracket leg (stop-loss or take-profit) must have filled and closed it.
       const reconciled = await reconcileClosedByBracketLeg(alpaca, openPosition);
       log.reconciled = reconciled;
+      console.log(`[day-trader-v1] ${now.toISOString()} reconciled ${openPosition.symbol}:`, reconciled);
       // Only clear the local flag once the DB row itself is actually closed —
       // if neither leg shows a fill yet, the DB (and Alpaca) both still
       // consider the position open, and a new entry must stay blocked.
@@ -55,13 +56,29 @@ export async function GET(req: NextRequest) {
     } else if (openPosition && alpacaPositionForOpenSymbol && openPosition.entry_price === null) {
       // Entry order has now filled — backfill the real fill price.
       if (openPosition.entry_order_id) {
-        await backfillEntryFill(
-          openPosition.id,
-          openPosition.entry_order_id,
-          Number(alpacaPositionForOpenSymbol.avg_entry_price),
-          new Date().toISOString()
-        );
-        openPosition = { ...openPosition, entry_price: Number(alpacaPositionForOpenSymbol.avg_entry_price) };
+        try {
+          await backfillEntryFill(
+            openPosition.id,
+            openPosition.entry_order_id,
+            Number(alpacaPositionForOpenSymbol.avg_entry_price),
+            new Date().toISOString()
+          );
+          openPosition = { ...openPosition, entry_price: Number(alpacaPositionForOpenSymbol.avg_entry_price) };
+          console.log(
+            `[day-trader-v1] ${now.toISOString()} backfilled entry fill for ${openPosition.symbol} (position ${openPosition.id}): ${alpacaPositionForOpenSymbol.avg_entry_price}`
+          );
+        } catch (err) {
+          // Don't let a backfill failure take down the whole cycle (equity
+          // tracking and force-close eligibility below don't depend on it) —
+          // but do surface it, since a silent, repeated failure here is
+          // exactly what made a real incident hard to diagnose after the
+          // fact (2026-08-31: no logging existed at all in this route).
+          console.error(
+            `[day-trader-v1] ${now.toISOString()} FAILED to backfill entry fill for ${openPosition.symbol} (position ${openPosition.id}):`,
+            err instanceof Error ? err.message : err
+          );
+          log.backfillError = err instanceof Error ? err.message : String(err);
+        }
       }
       log.backfilledEntryPrice = alpacaPositionForOpenSymbol.avg_entry_price;
     } else if (!openPosition && alpacaPositions.length > 0) {
@@ -69,6 +86,10 @@ export async function GET(req: NextRequest) {
       // adopting it so it isn't silently forgotten (and so force-close still
       // manages it later today).
       log.orphanedAlpacaPositions = alpacaPositions.map((p) => p.symbol);
+      console.error(
+        `[day-trader-v1] ${now.toISOString()} orphaned Alpaca position(s) our DB doesn't know about:`,
+        log.orphanedAlpacaPositions
+      );
     }
 
     // --- 2. Track equity every cycle for the live equity curve. ---

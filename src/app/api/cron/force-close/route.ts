@@ -24,8 +24,16 @@ export async function GET(req: NextRequest) {
 
   const openPosition = await getOpenPosition();
   if (!openPosition) {
+    // Normal on most ticks once the window is open-ended (see
+    // isForceCloseWindow) — every 5-min retry after the position actually
+    // closes lands here. Logged at info level, not an error.
+    console.log(`[force-close] ${now.toISOString()} no open position, nothing to do`);
     return NextResponse.json({ skipped: "no_open_position" });
   }
+
+  console.log(
+    `[force-close] ${now.toISOString()} attempting close: ${openPosition.symbol} x${openPosition.qty} (position ${openPosition.id}, opened ${openPosition.opened_at})`
+  );
 
   const alpaca = createAlpacaClientFromEnv("DAY_TRADER_V1");
 
@@ -61,6 +69,10 @@ export async function GET(req: NextRequest) {
       closedAt: filledOrder?.filled_at ?? new Date().toISOString(),
     });
 
+    console.log(
+      `[force-close] ${now.toISOString()} closed ${openPosition.symbol}: exit ${exitPrice}, pnl ${closed.realized_pnl}, confirmedFill=${Boolean(filledOrder)}`
+    );
+
     return NextResponse.json({
       action: "force_closed",
       symbol: openPosition.symbol,
@@ -69,10 +81,11 @@ export async function GET(req: NextRequest) {
       confirmedFill: Boolean(filledOrder),
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[force-close] ${now.toISOString()} FAILED to close ${openPosition.symbol} (position ${openPosition.id}): ${message}`
     );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

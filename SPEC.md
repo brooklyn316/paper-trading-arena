@@ -196,3 +196,30 @@ effective spread cost is visible over time.
       to ~$10K/~0.1%. Fixed by only counting that market value when a
       position is actually open per our own DB (`positions.status='open'`);
       with nothing open, equity is just cash.
+- [x] Found + fixed (2026-09-02, caught reading the real trade on
+      `/history/2026-08-31`): the one real trade (META) opened 2026-08-31
+      3:10pm ET and was NOT force-closed until 2026-09-01 3:55pm ET — held
+      open overnight for ~24.75h, violating the bot's own "no overnight
+      exposure, force-close by 3:55pm" design. Root cause not fully
+      pinned down (neither cron route logged anything, so Aug 31's exact
+      failure is unrecoverable after the fact) — Vercel's logs confirm
+      `force-close` fired on schedule at 19:55:18 UTC (the one and only
+      eligible tick that day) and returned 200 with no error, so whatever
+      went wrong did so silently. That one-tick-per-day design was itself
+      the deeper problem: `isForceCloseWindow()` was a 5-minute window
+      (3:55-4:00pm ET) matched almost exactly to the cron's 5-minute
+      cadence, so a single missed/failed attempt had no same-day retry.
+      Fixed in two parts: (1) widened `isForceCloseWindow()` in `time.ts` to
+      stay open from 3:55pm ET onward rather than closing at 4:00 — the
+      route is already a safe no-op once nothing is open, so retrying every
+      5 minutes for as long as the cron keeps firing (bounded by its own
+      `vercel.json` schedule, currently through ~5:55pm ET) turns a missed
+      attempt into a few-minutes-late one instead of a next-day one; (2)
+      added console logging to both cron routes (attempt/success/failure on
+      force-close; reconciliation and entry-fill-backfill outcomes on the
+      main route, including catching and logging backfill errors instead of
+      letting them pass silently) so a repeat is actually diagnosable. Also
+      fixed the history day-detail page to show the full date (not just the
+      time) for a trade's open/close when they land on different days, plus
+      a "held overnight" badge — the bare time was actively misleading
+      before this (read as same-day 3:55pm, was actually next-day).
