@@ -166,3 +166,22 @@ effective spread cost is visible over time.
       pages don't drift. Verified visually (light + dark, temporary
       fixture-data preview routes, deleted before commit). Type-checks and
       builds clean.
+- [x] Found + fixed (2026-09-02, caught by David reading the new history
+      page): equity was overstated by the full cost basis of any open
+      position, for as long as it stayed open. The cron's equity-tick cash
+      figure (`getCurrentTrackedCash()`, `starting_cash + closed-trade P&L`)
+      never accounted for money already spent buying the current open
+      position — so `equity = cash + market_value` counted that money
+      twice: once as untouched cash, again as the stock's value. On the one
+      real trade so far (6 shares of META, $10,000 start), this inflated
+      equity from a true ~$9,980-10,040 range up to ~$13,350-13,500 for the
+      ~24 hours the position was open. Fixed at the source in the cron
+      (`api/cron/day-trader-v1/route.ts`) by netting Alpaca's own
+      `cost_basis` for open positions out of tracked cash before recording
+      the tick, and the same way on the dashboard's live figure
+      (`summarizeBot()` in `queries.ts`, using the open position's
+      `entry_price * qty` from our own DB). Also corrected the ~90
+      already-written `equity_ticks` rows from the contaminated window via a
+      direct SQL update (Supabase MCP) rather than leaving bad history
+      behind. Position sizing itself was never affected — it only runs when
+      no position is open, when tracked cash and net cash are identical.

@@ -74,8 +74,17 @@ export async function GET(req: NextRequest) {
     // --- 2. Track equity every cycle for the live equity curve. ---
     const trackedCash = await getCurrentTrackedCash();
     const marketValue = alpacaPositions.reduce((sum, p) => sum + Number(p.market_value), 0);
-    await recordEquityTick({ cash: trackedCash, marketValue });
+    // trackedCash is starting_cash + closed-trade P&L only — it has no idea
+    // money is currently tied up in an open position. Recording it as-is
+    // while a position is open double-counts that position: once as
+    // untouched "cash", again as the stock's market value. Net out what's
+    // actually still invested (Alpaca's own cost_basis for each open
+    // position) so cash + marketValue lands on the real equity.
+    const openCostBasis = alpacaPositions.reduce((sum, p) => sum + Number(p.cost_basis), 0);
+    const netCash = trackedCash - openCostBasis;
+    await recordEquityTick({ cash: netCash, marketValue });
     log.trackedCash = trackedCash;
+    log.netCash = netCash;
     log.marketValue = marketValue;
 
     // --- 3. If a position is already open, don't look for a new entry. ---

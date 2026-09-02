@@ -205,7 +205,7 @@ async function summarizeBot(
   supabase: ReturnType<typeof createPublicClient>,
   bot: { id: string; name: string; strategy_summary: string | null; starting_cash: number; is_active: boolean }
 ): Promise<BotSummary> {
-  const [latestEquityRes, closedRes] = await Promise.all([
+  const [latestEquityRes, closedRes, openRes] = await Promise.all([
     supabase
       .from("equity_ticks")
       .select("market_value")
@@ -214,12 +214,27 @@ async function summarizeBot(
       .limit(1)
       .maybeSingle(),
     supabase.from("positions").select("realized_pnl").eq("bot_id", bot.id).eq("status", "closed"),
+    supabase
+      .from("positions")
+      .select("qty, entry_price")
+      .eq("bot_id", bot.id)
+      .eq("status", "open")
+      .maybeSingle(),
   ]);
 
   const startingCash = Number(bot.starting_cash);
   const closed = closedRes.data ?? [];
   const realizedTotal = closed.reduce((sum, p) => sum + Number(p.realized_pnl ?? 0), 0);
-  const currentCash = startingCash + realizedTotal;
+  // What's actually still tied up in the open position (if any), so it isn't
+  // double-counted below: once as cash that was never really spent, again as
+  // the position's market value. entry_price is null for the few seconds
+  // between submitting the entry order and its fill being backfilled — cost
+  // basis is treated as 0 for that brief window rather than blocking on it.
+  const openCostBasis =
+    openRes.data && openRes.data.entry_price !== null
+      ? Number(openRes.data.qty) * Number(openRes.data.entry_price)
+      : 0;
+  const currentCash = startingCash + realizedTotal - openCostBasis;
   // Equity = live cash + the open position's last-known market value — NOT
   // the stored `equity` column on the latest tick. That column bakes in
   // whatever starting_cash was true *when the cron last ran*, so it goes
